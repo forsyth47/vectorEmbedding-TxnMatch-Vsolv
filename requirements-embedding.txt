@@ -1,0 +1,9 @@
+numpy
+pandas
+polars
+psutil
+h5py
+spacy
+sentence-transformers
+rapidfuzz
+hnswlib
