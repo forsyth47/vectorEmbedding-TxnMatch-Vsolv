@@ -1,12 +1,12 @@
 """
-Ultra-Efficient Entity Matching Pipeline
-Combines Sentence-Transformers + HNSWlib/Numpy + RapidFuzz for 1M x 1M matching
+Ultra-Pro-Max-Efficient Entity Matching Pipeline
+Combines Sentence-Transformers + HNSWlib/Numpy + RapidFuzz
 
 Features:
 - Memory-efficient disk-based processing
-- Configurable similarity search: HNSWlib (fast) or Numpy (removed due inefficiency)
-- Named Entity Recognition with spaCy for automated city detection
-- Automated city/locality matching for confidence boosting
+- Configurable similarity search: HNSWlib or Numpy (removed due numpy sucks)
+- Named Entity Recognition with spaCy for city detection (auto)
+- city/locality matching for confidence boosting (auto)
 - Chunked processing to avoid memory spikes
 - CPU-only processing with optional GPU for embeddings
 - Real-time profiling and monitoring
@@ -33,30 +33,13 @@ import h5py
 warnings.filterwarnings('ignore')
 
 # Core ML libraries
+import hnswlib
 import spacy
 from sentence_transformers import SentenceTransformer
 from rapidfuzz import fuzz
 
 # Add multiprocessing imports for parallel batch processing
-import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-from functools import partial
-
-# Check if DuckDB is available
-DB_AVAILABLE = "sqlite"
-
-# HNSWlib for fast similarity search
-try:
-    import hnswlib
-    HNSWLIB_AVAILABLE = True
-    print("✅ HNSWlib available - ultra-fast similarity search enabled!")
-except ImportError:
-    HNSWLIB_AVAILABLE = False
-    print("❌ HNSWlib not available. Install with: pip install hnswlib")
-    raise ImportError("HNSWlib is required for this pipeline. Install with: pip install hnswlib")
-
-# Remove FAISS dependency - HNSWlib only
-FAISS_AVAILABLE = False
 
 #=== Memory Profiler Class ===
 
@@ -143,12 +126,10 @@ class AutomatedCityMatcher:
         ]
 
         # Common location suffixes in Indian context
-        self.location_suffixes = {
-            'nagar', 'pur', 'bad', 'ganj', 'gram', 'puram', 'patnam', 'kota',
+        self.location_suffixes = {'nagar', 'pur', 'bad', 'ganj', 'gram', 'puram', 'patnam', 'kota',
             'ville', 'pally', 'wadi', 'garh', 'kot', 'gunj', 'tola', 'para',
             'puram', 'salem', 'coimbatore', 'madurai', 'trichy', 'kanchipuram',
-            'ramanathapuram', 'tirunelveli', 'vellore', 'thanjavur'
-        }
+            'ramanathapuram', 'tirunelveli', 'vellore', 'thanjavur'}
 
         # Major Indian cities for fallback (expanded set)
         self.major_cities = {
@@ -198,9 +179,9 @@ class AutomatedCityMatcher:
                         line = line.strip()
                         if line and not line.startswith('#'):  # Skip comments and empty lines
                             self.discovered_locations.add(line)
-                print(f"📍 Loaded {len(self.discovered_locations)} previously discovered locations")
+                #print(f"📍 Loaded {len(self.discovered_locations)} previously discovered locations")
             except Exception as e:
-                print(f"⚠️  Failed to load discovered locations: {e}")
+                #print(f"⚠️  Failed to load discovered locations: {e}")
                 self.discovered_locations = set()
 
     def _save_discovered_locations(self):
@@ -327,8 +308,8 @@ class AutomatedCityMatcher:
 
     def finalize_session(self):
         """Save discovered locations at the end of processing session"""
-        self._save_discovered_locations()
-        print(f"💾 Saved {len(self.discovered_locations)} discovered locations for future use")
+        #self._save_discovered_locations()
+        #print(f"💾 Saved {len(self.discovered_locations)} discovered locations for future use")
 
 class TransactionCleaner:
     """Intelligent transaction text cleaner that removes noise while preserving company names"""
@@ -561,7 +542,6 @@ class EfficientEntityMatcher:
     """
 
     def __init__(self,
-                 use_gpu: bool = False,
                  batch_size: int = 10000,
                  confidence_threshold: float = 85.0,
                  max_candidates: int = 10,
@@ -584,7 +564,6 @@ class EfficientEntityMatcher:
                  # NEW TRANSACTION FILTERING PARAMETERS
                  enable_transaction_filtering: bool = True):
 
-        self.use_gpu = use_gpu
         self.batch_size = batch_size
         self.confidence_threshold = confidence_threshold
         self.max_candidates = max_candidates
@@ -1453,6 +1432,14 @@ class EfficientEntityMatcher:
                 txn_col_name = transactions_df.columns[0]  # Fallback to first column
             print(f"Auto-detected transaction column: '{txn_col_name}'")
 
+        # Handle batch_size=None for parallel processing - split equally among workers
+        if self.batch_size is None:
+            effective_batch_size = max(1, total_transactions // self.parallel_workers)
+            print(
+                f"📦 batch_size=None detected - splitting {total_transactions:,} transactions equally among {self.parallel_workers} workers")
+            print(f"📦 Calculated batch size: {effective_batch_size:,} per worker")
+        else:
+            effective_batch_size = self.batch_size
         print(f"Processing {total_transactions:,} transactions in parallel batches of {self.batch_size:,}")
         print(f"📋 Using transaction column: '{txn_col_name}'")
 
@@ -1611,6 +1598,13 @@ class EfficientEntityMatcher:
                 txn_col_name = transactions_df.columns[0]  # Fallback to first column
             print(f"Auto-detected transaction column: '{txn_col_name}'")
 
+        # Handle batch_size=None for sequential processing - use default 50000
+        if self.batch_size is None:
+            effective_batch_size = 50000
+            print(f"📦 batch_size=None detected - using default batch size: {effective_batch_size:,}")
+        else:
+            effective_batch_size = self.batch_size
+
         print(f"Processing {total_transactions:,} transactions in batches of {self.batch_size:,}")
         print(f"📋 Using transaction column: '{txn_col_name}'")
 
@@ -1671,7 +1665,6 @@ class EfficientEntityMatcher:
         start_time = time.time()
 
         print("🚀 Starting Ultra-Efficient Entity Matching Pipeline with Enhanced Features")
-        print(f"⚙️  HNSWlib Available: {HNSWLIB_AVAILABLE}")
         print(f"🏙️  Automated City Detection: {self.enable_automated_city_detection}")
         print(f"📊 Batch Size: {self.batch_size:,}")
         print(f"🎯 Confidence Threshold: {self.confidence_threshold}")
@@ -1708,8 +1701,6 @@ class EfficientEntityMatcher:
                     self.build_hnswlib_index()
 
             # Step 3: Match transactions with enhanced processing
-            print(f"\n🎯 Using enhanced HNSWlib pipeline with improved scoring")
-
             # Choose between parallel and sequential processing
             if self.enable_parallel_processing:
                 print(f"🔀 PARALLEL PROCESSING ENABLED - Using {self.parallel_workers} {self.parallel_method} workers")
@@ -1725,9 +1716,8 @@ class EfficientEntityMatcher:
             # Step 5: Final summary
             total_time = time.time() - start_time
             print(f"\n🏁 Enhanced Pipeline Complete!")
-            print(f"⏱️  Total Time: {total_time:.2f} seconds")
             print(f"🔧 Backend Used: HNSWlib Enhanced (M={self.M})")
-            print(f"📁 Results: {results_file}")
+            print(f"   Results: {results_file}")
 
             if self.city_matcher and self.enable_automated_city_detection:
                 discovered_locations = self.city_matcher.get_discovered_locations()
@@ -1788,7 +1778,6 @@ def main():
 
     # Enhanced Configuration with new features
     CONFIG = {
-        'use_gpu': True,  # Set to True to enable GPU for embeddings
         # 'batch_size': 62501,  # Adjust based on available memory
         'batch_size': 7000,  # Adjust based on available memory
         'confidence_threshold': 50.0,  # Lowered threshold for better matching
@@ -1820,7 +1809,7 @@ def main():
             'fuzzy_score': False,  # Keep fuzzy matching score
             'city_boost': False,  # Keep city boost score
             'final_score': True,  # Keep final combined score
-            'detected_company_name': True  # Shows cleaned/filtered transaction text used for matching
+            'detected_company_name': False  # Shows cleaned/filtered transaction text used for matching
         },
         # 'company_column': ['Company_Name'],  # Specify column name for company data
         # 'transaction_column': ['Narration'],  # Specify column name for transaction data
@@ -1872,16 +1861,7 @@ def main():
             sort_by_score=True  # Sort results by final score (highest first)
         )
 
-        # Print summary of improvements made
-        # print(f"\n📊 Enhanced Features Summary:")
-        # print(f"✅ Automated city detection using NER and pattern matching")
-        # print(f"✅ Improved scoring system with intelligent weighting")
-        # print(f"✅ Enhanced text normalization for better matching")
-        # print(f"✅ Configurable output columns")
-        # print(f"✅ Results sorted by final score (descending)")
-        # print(f"✅ Ultra-fast search with M={CONFIG['M']} connections")
-
-        # if CONFIG['enable_automated_city_detection']:
+    # if CONFIG['enable_automated_city_detection']:
         #     print(f"✅ Will automatically discover new cities/locations during processing")
 
     except KeyboardInterrupt:
